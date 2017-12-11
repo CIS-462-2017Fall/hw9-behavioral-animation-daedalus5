@@ -157,26 +157,31 @@ void BehaviorController::control(double deltaT)
 
 		//  force and torque inputs are computed from vd and thetad as follows:
 		//              Velocity P controller : force = mass * Kv * (vd - v)
-		//              Heading PD controller : torque = Inertia * (-Kv * thetaDot -Kp * (thetad - theta))
+		//              Heading PD controller : torque = Inertia * (-Kv * thetaDot +Kp * (thetad - theta))
 		//  where the values of the gains Kv and Kp are different for each controller
 
+		m_vd = m_Vdesired.Length();
+
 		// TODO: insert your code here to compute m_force and m_torque
+		gVelKv = 10.0;
+		gOriKp = 256.0;
+		gOriKv = 32.0;
 
+		m_force = gMass * gVelKv * (m_Vdesired - m_state[VEL]);
 
+		double thetad = atan2(m_Vdesired[2], m_Vdesired[0]);
+		double angleDiff = thetad - m_state[ORI][1];
+		ClampAngle(angleDiff);
+		m_torque[0] = 0.0;
+		m_torque[1] = gInertia * (-gOriKv * m_state[AVEL][1] + gOriKp * (angleDiff));
+		m_torque[2] = 0.0;
 
-
-
-
-
-
-
-
-
-
+		m_thetad = thetad;
 
 		// when agent desired agent velocity and actual velocity < 2.0 then stop moving
 		if (m_vd < 2.0 &&  m_state[VEL][_Z] < 2.0)
 		{
+			//m_force[0] = 0.0;
 			m_force[2] = 0.0;
 			m_torque[1] = 0.0;
 		}
@@ -185,6 +190,13 @@ void BehaviorController::control(double deltaT)
 	{
 		m_force[2] = 0.0;
 		m_torque[1] = 0.0;
+	}
+
+	if (m_force.Length() > gMaxForce) {
+		m_force = m_force.Normalize() * gMaxForce;
+	}
+	if (m_torque.Length() > gMaxTorque) {
+		m_torque = m_torque.Normalize() * gMaxTorque;
 	}
 
 	// set control inputs to current force and torque values
@@ -211,10 +223,17 @@ void BehaviorController::computeDynamics(vector<vec3>& state, vector<vec3>& cont
 
 	// Compute the stateDot vector given the values of the current state vector and control input vector
 	// TODO: add your code here
-
-
-
-
+	
+	// agent velocity in world coordinates
+	mat3 rotY = mat3();
+	rotY.FromAxisAngle(vec3(0.0, 1.0, 0.0), state[1][1] * M_PI / 180.0);
+	stateDot[0] = rotY * state[VEL];
+	// body angular velocity
+	stateDot[1] = state[3];
+	// body acceleration
+	stateDot[2] = (1.0 / gMass) * force;
+	// body angular acceleration
+	stateDot[3] = (1.0 / gInertia) * torque;
 
 }
 
@@ -225,15 +244,14 @@ void BehaviorController::updateState(float deltaT, int integratorType)
 
 	// TODO: add your code here
 	
-
-
-
-
-
-
+	// simple Euler integration
+	for (int i = 0; i < 4; ++i) {
+		m_state[i] = m_state[i] + m_stateDot[i] * deltaT;
+	}
 
 	//  given the new values in m_state, these are the new component state values 
 	m_Pos0 = m_state[POS];
+	m_Vel0 = m_stateDot[VEL];
 	m_Euler = m_state[ORI];
 	m_VelB = m_state[VEL];
 	m_AVelB = m_state[AVEL];
@@ -241,12 +259,12 @@ void BehaviorController::updateState(float deltaT, int integratorType)
 	//  Perform validation check to make sure all values are within MAX values
 	// TODO: add your code here
 
-
-
-
-
-
-
+	if (m_VelB.Length() > gMaxSpeed) {
+		m_VelB = m_VelB.Normalize() * gMaxSpeed;
+	}
+	if (m_AVelB.Length() > gMaxAngularSpeed) {
+		m_AVelB = m_AVelB.Normalize() * gMaxAngularSpeed;
+	}
 
 	// update the guide orientation
 	// compute direction from nonzero velocity vector
