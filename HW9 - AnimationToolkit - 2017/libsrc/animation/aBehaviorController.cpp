@@ -171,6 +171,7 @@ void BehaviorController::control(double deltaT)
 
 		double thetad = atan2(m_Vdesired[2], m_Vdesired[0]);
 		double angleDiff = thetad - m_state[ORI][1];
+
 		ClampAngle(angleDiff);
 		m_torque[0] = 0.0;
 		m_torque[1] = gInertia * (-gOriKv * m_state[AVEL][1] + gOriKp * (angleDiff));
@@ -226,8 +227,10 @@ void BehaviorController::computeDynamics(vector<vec3>& state, vector<vec3>& cont
 	
 	// agent velocity in world coordinates
 	mat3 rotY = mat3();
-	rotY.FromAxisAngle(vec3(0.0, 1.0, 0.0), state[1][1] * M_PI / 180.0);
-	stateDot[0] = rotY * state[VEL];
+	rotY.FromAxisAngle(vec3(0.0, 1.0, 0.0), state[ORI][1] * M_PI / 180.0);
+	//stateDot[0] = rotY * state[VEL];
+	stateDot[0] = state[VEL];
+
 	// body angular velocity
 	stateDot[1] = state[3];
 	// body acceleration
@@ -251,7 +254,7 @@ void BehaviorController::updateState(float deltaT, int integratorType)
 
 	//  given the new values in m_state, these are the new component state values 
 	m_Pos0 = m_state[POS];
-	m_Vel0 = m_stateDot[VEL];
+	m_Vel0 = m_stateDot[0];
 	m_Euler = m_state[ORI];
 	m_VelB = m_state[VEL];
 	m_AVelB = m_state[AVEL];
